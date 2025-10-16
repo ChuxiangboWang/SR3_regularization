@@ -11,10 +11,10 @@
         "batch_size": 16,
         "batch_size_eval": 1,  // Increase with large data set
         "learning_rate": 1.0,
-        "epochs": 2000, 
+        "epochs": 2000, // Increase with large data set
         "num_workers": 4,
         "extra_args": ["-c", "config/celebahq.json"],
-        "ckpt_path": null,
+        "ckpt_path": null, // "pretrain_CNN/cnn_weights.pth"
         "TVrelu": 1
       },
     
