@@ -1,6 +1,6 @@
 {
     "name": "tv0_pretrain",
-    "phase": "pretrain", 
+    "phase": "pretrain", // train | val | pretrain
     
     "pretrain": {
         "script": "pretrain_CNN/train.py",  
