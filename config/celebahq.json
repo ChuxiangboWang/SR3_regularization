@@ -9,7 +9,7 @@
         "hr_dir": "./dataset/celebahq_16_128/hr_128",
         "lr_dir": "./dataset/celebahq_16_128/lr_16",  
         "batch_size": 16,
-        "batch_size_eval": 3,  // Increase with large data set
+        "batch_size_eval": 1,  // Increase with large data set
         "learning_rate": 1.0,
         "epochs": 2000, 
         "num_workers": 4,
