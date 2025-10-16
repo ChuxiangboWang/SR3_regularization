@@ -1,20 +1,20 @@
 {
     "name": "tv0_pretrain",
-    "phase": "pretrain", // train | val | pretrain
+    "phase": "pretrain", 
     
     "pretrain": {
         "script": "pretrain_CNN/train.py",  
-        "lr": 64,
+        "lr": 16,
         "hr": 128,
-        "hr_dir": "./dataset/celebahq_64_128/hr_128",
-        "lr_dir": "./dataset/celebahq_64_128/lr_64",  
+        "hr_dir": "./dataset/celebahq_16_128/hr_128",
+        "lr_dir": "./dataset/celebahq_16_128/lr_16",  
         "batch_size": 16,
         "batch_size_eval": 3,  // Increase with large data set
         "learning_rate": 1.0,
-        "epochs": 2000, // Increase with large data set
+        "epochs": 2000, 
         "num_workers": 4,
         "extra_args": ["-c", "config/celebahq.json"],
-        "ckpt_path": null // "pretrain_CNN/cnn_weights.pth",
+        "ckpt_path": null,
         "TVrelu": 1
       },
     
