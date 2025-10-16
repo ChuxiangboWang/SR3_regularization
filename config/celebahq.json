@@ -14,7 +14,8 @@
         "epochs": 2000, // Increase with large data set
         "num_workers": 4,
         "extra_args": ["-c", "config/celebahq.json"],
-        "ckpt_path": null // "pretrain_CNN/cnn_weights.pth"
+        "ckpt_path": null // "pretrain_CNN/cnn_weights.pth",
+        "TVrelu": 1
       },
     
     "gpu_ids": [0],
