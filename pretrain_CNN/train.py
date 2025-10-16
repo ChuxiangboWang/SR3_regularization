@@ -14,7 +14,7 @@ from Simple_CNN import SimpleCNN
 from loss import image_compare_loss
 from TV_activation import TVLeakyReLU
 from pathlib import Path
-ROOT = Path(__file__).resolve().parents[1]  
+ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import core.logger as Logger
 
@@ -103,7 +103,7 @@ def main():
         if key not in cfg:
             raise KeyError(f'Missing required key in pretrain config: "{key}"')
         return cfg[key]
-    
+
     args_for_logger = argparse.Namespace(
     config=args.config,
     phase=None,
@@ -119,9 +119,9 @@ def main():
 
     pre = opt.get('pretrain', {}) or {}
     if not isinstance(pre, dict) or not pre:
-        raise KeyError('Missing "pretrain" block in config JSON.')  
+        raise KeyError('Missing "pretrain" block in config JSON.')
 
-      
+
     lr               = int(require(pre, 'lr'))
     hr               = int(require(pre, 'hr'))
     hr_dir           = require(pre, 'hr_dir')
@@ -154,8 +154,8 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-   
-    
+
+
     # ---------- transforms (needed for dataset) ----------
     transform = transforms.Compose([transforms.ToTensor()])
 
@@ -172,8 +172,10 @@ def main():
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False,num_workers = num_workers)
 
     # Create models, loss functions and optimizers
-    model = SimpleCNN(scale_factor=scale_factor).to(device)
-   
+
+    use_TVrelu = bool(pre.get('TVrelu', 0))
+    model = SimpleCNN(scale_factor=scale_factor, use_TVrelu=use_TVrelu).to(device)
+
     print("Using device:", device)
     print("Model device:", next(model.parameters()).device)
 
@@ -182,7 +184,7 @@ def main():
         print(f"Loaded weights from {ckpt_path}")
     else:
         print("No pretrained model found — training from scratch")
-   
+
 
     criterion = image_compare_loss
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
