@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .TV_activation import TVLeakyReLU
+from TV_activation import TVLeakyReLU
 
 class SimpleCNN(nn.Module):
     def __init__(self, scale_factor=4, use_TVrelu=False):
