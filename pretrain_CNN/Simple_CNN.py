@@ -10,15 +10,13 @@ class SimpleCNN(nn.Module):
         self.use_TVrelu = use_TVrelu
 
         # convolution layers
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1)
-        self.conv4 = nn.Conv2d(32, 3 * scale_factor ** 2, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=True)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1, bias=True)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.conv3 = nn.Conv2d(32, 3 * scale_factor ** 2, kernel_size=3, stride=1, padding=1, bias=True)
         self.pixel_shuffle = nn.PixelShuffle(scale_factor)
-
-        self.relu = nn.ReLU(inplace=True)
-        self.tvleaky = TVLeakyReLU(n_channel=3)
-
+        self.tvleaky = TVLeakyReLU(n_channel=32)
         self._init_weights()
 
     def _init_weights(self):
@@ -27,24 +25,26 @@ class SimpleCNN(nn.Module):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-        nn.init.normal_(self.conv4.weight, mean=0.0, std=0.001)
-        if self.conv4.bias is not None:
-            nn.init.constant_(self.conv4.bias, 0)
+        nn.init.normal_(self.conv3.weight, mean=0.0, std=0.001)
+        if self.conv3.bias is not None:
+            nn.init.constant_(self.conv3.bias, 0)
 
     def forward(self, x):
         x_skip = x
         x_up = F.interpolate(x_skip, scale_factor=self.scale_factor,
                              mode='bicubic', align_corners=False)
 
-        x = self.relu(self.conv1(x))
-        x = self.relu(self.conv2(x))
-        x = self.relu(self.conv3(x))
-        x = self.conv4(x)
-        x = self.pixel_shuffle(x)
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
 
-        # Apply TVLeakyReLU only if enabled in config
         if self.use_TVrelu:
             x = self.tvleaky(x)
+        else:
+            x = self.relu2(x)
+
+        x = self.conv3(x)
+        x = self.pixel_shuffle(x)
 
         return x + x_up
 
