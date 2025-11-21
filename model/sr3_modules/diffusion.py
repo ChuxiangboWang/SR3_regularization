@@ -1,3 +1,4 @@
+import os
 import math
 import torch
 from torch import device, nn, einsum
@@ -93,7 +94,69 @@ class GaussianDiffusion(nn.Module):
         self.tvf_alpha = tvf_alpha
         self.wavelet_type = wavelet_type
         self.wavelet_l1_weight = wavelet_l1_weight
+        # --------- VGG19 ---------
+        import torchvision.models as models
+        import torch.nn as nn
+
+        vgg = models.vgg19(pretrained=True).features[:16]
+        self.vgg = nn.Sequential(*vgg)
+
+        # Freeze VGG parameters
+        for p in self.vgg.parameters():
+            p.requires_grad = False
+
+        self.vgg.eval()    # inference mode
+
+        # weight for VGG loss
+        self.vgg_weight = 0.1
+        self.global_step = 0
+        self.vgg_vis_dir = "VGG feature"
+
+
+
+
+    def vgg_features(self, x):
+        # normalized to ImageNet mean and std
+        mean = torch.tensor([0.485, 0.456, 0.406], device=x.device).view(1,3,1,1)
+        std = torch.tensor([0.229, 0.224, 0.225], device=x.device).view(1,3,1,1)
+
+        x_norm = (x - mean) / std
+        return self.vgg(x_norm)
+    
+    def save_feature_map(self, fmap, filename):
+
+        import torchvision.utils as vutils
+
+        # Take batch 0, channel 0
+        x = fmap[0, 0, :, :]
+
+        # Normalize to [0,1] so it can be saved as an image
+        x = (x - x.min()) / (x.max() - x.min() + 1e-8)
+
+        # Save the image
+        vutils.save_image(x, filename)
+
+
+    def save_rgb_image(self, img, filename):
+
+        import torchvision.utils as vutils
+
+        x = img[0].detach() 
+
+     
+        x = (x + 1) / 2.0
+        x = x.clamp(0.0, 1.0)
+
+        vutils.save_image(x, filename)
+
+
+
+
+
     def set_loss(self, device):
+
+        self.vgg.to(device)
+
         if self.loss_type == 'l1':
             self.loss_func = nn.L1Loss(reduction='sum').to(device)
         elif self.loss_type == 'l2':
@@ -263,19 +326,80 @@ class GaussianDiffusion(nn.Module):
             x_recon = self.denoise_fn(
                 torch.cat([x_in['SR'], x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
         y_recon = self.predict_start_from_noise(x_noisy, t-1, x_recon)
+
+
+        # Save φ(y), φ(y_recon), and the difference (every 1000 steps)
+        if self.vgg_weight > 0 and (self.global_step % 1000 == 0):
+            y = x_in['HR']
+            with torch.no_grad():
+                phi_y = self.vgg_features(y)
+                phi_recon = self.vgg_features(y_recon)
+                phi_diff = phi_y - phi_recon
+
+            # ensure folder exists
+            os.makedirs(self.vgg_vis_dir, exist_ok=True)
+
+            # Save original HR and reconstructed HR
+            self.save_rgb_image(
+                y,
+                f"{self.vgg_vis_dir}/hr_y_step{self.global_step}.png"
+            )
+            self.save_rgb_image(
+                y_recon,
+                f"{self.vgg_vis_dir}/hr_y_recon_step{self.global_step}.png"
+            )
+
+            # Save feature maps
+            self.save_feature_map(
+                phi_y,
+                f"{self.vgg_vis_dir}/vgg_phi_y_step{self.global_step}.png"
+            )
+            self.save_feature_map(
+                phi_recon,
+                f"{self.vgg_vis_dir}/vgg_phi_recon_step{self.global_step}.png"
+            )
+            self.save_feature_map(
+                phi_diff,
+                f"{self.vgg_vis_dir}/vgg_phi_diff_step{self.global_step}.png"
+            )
+
+
+
+        # --------- VGG Loss ---------
+        if self.vgg_weight > 0:
+            # Ground-truth HR image
+            y = x_in['HR']
+
+            # φ(y) and φ(y_recon)
+            with torch.no_grad():
+                phi_y = self.vgg_features(y)   # GT feature
+
+            phi_recon = self.vgg_features(y_recon)  # reconstructed feature
+
+            # L1 loss between VGG features
+            loss_vgg = self.vgg_weight * F.l1_loss(phi_recon, phi_y)
+
+        else:
+            loss_vgg = 0.0
+
         loss_noise = self.loss_func(noise, x_recon)
         loss_TV1 = self.tv1_weight*TV1(y_recon)
         loss_TV2 = self.tv2_weight*TV2(y_recon)
         loss_TVF = self.tvf_weight*FTV(y_recon, alpha=self.tvf_alpha)
         loss_wave = self.wavelet_l1_weight*waveL1(y_recon, wname=self.wavelet_type)
-        l_total = loss_noise + loss_TV1+ loss_TV2 + loss_TVF+ loss_wave
+        l_total = loss_noise + loss_TV1+ loss_TV2 + loss_TVF+ loss_wave + loss_vgg
+
+
+        self.global_step += 1
+
         return  {
             "total": l_total,
             "loss_noise": loss_noise,
             "loss_TV1": loss_TV1,
             "loss_TV2": loss_TV2,
             "loss_TVF": loss_TVF,
-            "loss_wave_l1":loss_wave
+            "loss_wave_l1":loss_wave,
+            "loss_vgg": loss_vgg
         }
 
 
