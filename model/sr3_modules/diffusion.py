@@ -1,6 +1,7 @@
 import os
 import math
 import torch
+import torchvision.utils as vutils
 from torch import device, nn, einsum
 import torch.nn.functional as F
 from inspect import isfunction
@@ -112,6 +113,9 @@ class GaussianDiffusion(nn.Module):
         self.global_step = 0
         self.vgg_vis_dir = "VGG feature"
 
+        # start VGG after N training iterations
+        self.vgg_start_step = 5000
+
 
 
 
@@ -123,23 +127,26 @@ class GaussianDiffusion(nn.Module):
         x_norm = (x - mean) / std
         return self.vgg(x_norm)
     
-    def save_feature_map(self, fmap, filename):
+    def save_feature_map(self, fmap, filename, num_channels=36):
 
-        import torchvision.utils as vutils
+        b, c, h, w = fmap.shape
+        # Take batch 0, first num_channels channels
+        n = min(num_channels, c)
+        x = fmap[0, :n, :, :].clone()   # [n, H, W]
 
-        # Take batch 0, channel 0
-        x = fmap[0, 0, :, :]
-
-        # Normalize to [0,1] so it can be saved as an image
-        x = (x - x.min()) / (x.max() - x.min() + 1e-8)
-
-        # Save the image
-        vutils.save_image(x, filename)
+        # Normalize each channel to [0, 1]
+        for i in range(n):
+            fm = x[i]
+            fm_min = fm.min()
+            fm_max = fm.max()
+            x[i] = (fm - fm_min) / (fm_max - fm_min + 1e-8)
+            
+        x = x.unsqueeze(1)
+        nrow = int(math.sqrt(n)) if int(math.sqrt(n))**2 == n else int(math.sqrt(n)) + 1
+        vutils.save_image(x, filename, nrow=nrow)
 
 
     def save_rgb_image(self, img, filename):
-
-        import torchvision.utils as vutils
 
         x = img[0].detach() 
 
@@ -329,7 +336,7 @@ class GaussianDiffusion(nn.Module):
 
 
         # Save φ(y), φ(y_recon), and the difference (every 1000 steps)
-        if self.vgg_weight > 0 and (self.global_step % 1000 == 0):
+        if self.vgg_weight > 0 and self.global_step >= self.vgg_start_step and (self.global_step % 1000 == 0):
             y = x_in['HR']
             with torch.no_grad():
                 phi_y = self.vgg_features(y)
@@ -366,7 +373,7 @@ class GaussianDiffusion(nn.Module):
 
 
         # --------- VGG Loss ---------
-        if self.vgg_weight > 0:
+        if self.vgg_weight > 0 and self.global_step >= self.vgg_start_step:
             # Ground-truth HR image
             y = x_in['HR']
 
@@ -405,3 +412,4 @@ class GaussianDiffusion(nn.Module):
 
     def forward(self, x, *args, **kwargs):
         return self.p_losses(x, *args, **kwargs)
+
