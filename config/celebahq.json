@@ -103,6 +103,13 @@
             "TVF_alpha": 0.0,//default is 1.6
             "wavelet_l1_weight": 0.0, //10000.0,
             "wavelet_type": "haar" //default is "haar". Other options includes "db", "sym", "coif"  (https://pywavelets.readthedocs.io/en/latest/ref/wavelets.html)
+        },
+  
+        "vgg": {
+           "weight": 0.1,            // Set to 0 to turn off VGG
+           "start_step": 5000,       // Starting iteration step of VGG
+           "vis_freq": 1000,         // VGG_feature_plot_every# iteration
+           "vis_num_channels": 36    // VGG_feature_plot_how many channels
         }
     },
     "train": {
