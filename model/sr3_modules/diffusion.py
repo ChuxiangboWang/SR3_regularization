@@ -9,6 +9,7 @@ from functools import partial
 import numpy as np
 from tqdm import tqdm
 from regularization import *
+from datetime import datetime
 
 
 def _warmup_beta(linear_start, linear_end, n_timestep, warmup_frac):
@@ -78,7 +79,8 @@ class GaussianDiffusion(nn.Module):
         tvf_weight=None,
         tvf_alpha=1.6,
         wavelet_l1_weight = None,
-        wavelet_type = "haar"
+        wavelet_type = "haar",
+        vgg_opt=None,
     ):
         super().__init__()
         self.channels = channels
@@ -95,6 +97,31 @@ class GaussianDiffusion(nn.Module):
         self.tvf_alpha = tvf_alpha
         self.wavelet_type = wavelet_type
         self.wavelet_l1_weight = wavelet_l1_weight
+
+
+        if vgg_opt is None:
+            vgg_opt = {}
+         
+        # weight for VGG loss
+        self.vgg_weight = float(vgg_opt.get("weight", 0.0))
+        self.vgg_start_step = int(vgg_opt.get("start_step", 0))
+        self.vgg_vis_freq = int(vgg_opt.get("vis_freq", 1000))
+        self.vgg_vis_num_channels = int(vgg_opt.get("vis_num_channels", 36))
+
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.vgg_vis_dir = os.path.join("VGG feature", timestamp)
+        self.global_step = 0
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         # --------- VGG19 ---------
         import torchvision.models as models
         import torch.nn as nn
@@ -107,14 +134,6 @@ class GaussianDiffusion(nn.Module):
             p.requires_grad = False
 
         self.vgg.eval()    # inference mode
-
-        # weight for VGG loss
-        self.vgg_weight = 0.1
-        self.global_step = 0
-        self.vgg_vis_dir = "VGG feature"
-
-        # start VGG after N training iterations
-        self.vgg_start_step = 5000
 
 
 
@@ -336,7 +355,7 @@ class GaussianDiffusion(nn.Module):
 
 
         # Save φ(y), φ(y_recon), and the difference (every 1000 steps)
-        if self.vgg_weight > 0 and self.global_step >= self.vgg_start_step and (self.global_step % 1000 == 0):
+        if self.vgg_weight > 0 and self.global_step >= self.vgg_start_step and (self.global_step % self.vgg_vis_freq == 0):
             y = x_in['HR']
             with torch.no_grad():
                 phi_y = self.vgg_features(y)
@@ -359,15 +378,15 @@ class GaussianDiffusion(nn.Module):
             # Save feature maps
             self.save_feature_map(
                 phi_y,
-                f"{self.vgg_vis_dir}/vgg_phi_y_step{self.global_step}.png"
+                f"{self.vgg_vis_dir}/vgg_phi_y_step{self.global_step}.png", num_channels=self.vgg_vis_num_channels,
             )
             self.save_feature_map(
                 phi_recon,
-                f"{self.vgg_vis_dir}/vgg_phi_recon_step{self.global_step}.png"
+                f"{self.vgg_vis_dir}/vgg_phi_recon_step{self.global_step}.png", num_channels=self.vgg_vis_num_channels,
             )
             self.save_feature_map(
                 phi_diff,
-                f"{self.vgg_vis_dir}/vgg_phi_diff_step{self.global_step}.png"
+                f"{self.vgg_vis_dir}/vgg_phi_diff_step{self.global_step}.png", num_channels=self.vgg_vis_num_channels,
             )
 
 
