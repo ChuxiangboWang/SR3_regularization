@@ -111,7 +111,8 @@ def define_G(opt):
         tvf_weight=model_opt['loss']['TVF_weight'],
         tvf_alpha=model_opt['loss']['TVF_alpha'],
         wavelet_l1_weight=model_opt['loss']['wavelet_l1_weight'],
-        wavelet_type=model_opt['loss']['wavelet_type']
+        wavelet_type=model_opt['loss']['wavelet_type'],
+        vgg_opt=vgg_opt,
     )
     if opt['phase'] == 'train':
         # init_weights(netG, init_type='kaiming', scale=0.1)
