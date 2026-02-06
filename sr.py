@@ -164,10 +164,11 @@ if __name__ == "__main__":
                         diffusion.test(continous=False,generator=gen)
 
                         visuals = diffusion.get_current_visuals()
-                        sr_img = Metrics.tensor2img(visuals['SR'])  # uint8
-                        hr_img = Metrics.tensor2img(visuals['HR'])  # uint8
-                        lr_img = Metrics.tensor2img(visuals['LR'])  # uint8
-                        fake_img = Metrics.tensor2img(visuals['INF'])  # uint8
+                        sr_img   = Metrics.tensor2img(visuals['SR'][-1])
+                        fake_img = Metrics.tensor2img(visuals['INF'][-1])
+                        hr_img   = Metrics.tensor2img(visuals['HR'][-1] if visuals['HR'].dim() == 4 else visuals['HR'])
+                        lr_img   = Metrics.tensor2img(visuals['LR'][-1] if visuals['LR'].dim() == 4 else visuals['LR'])
+
 
                         # generation
                         Metrics.save_img(
@@ -178,11 +179,28 @@ if __name__ == "__main__":
                             lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
                         Metrics.save_img(
                             fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
-                        tb_logger.add_image(
-                            'Iter_{}'.format(current_step),
-                            np.transpose(np.concatenate(
-                                (fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
-                            idx)
+                        
+                        
+                        
+                        
+                        
+                        
+                        grid = np.concatenate((fake_img, sr_img, hr_img), axis=1)
+
+                        # If grayscale came out as (H, W), add channel dim -> (H, W, 1)
+                        if grid.ndim == 2:
+                           grid = grid[:, :, None]
+
+                        # make it CHW for tensorboard: (C, H, W)
+                        grid_chw = np.transpose(grid, (2, 0, 1))
+
+                        tb_logger.add_image(f'Iter_{current_step}', grid_chw, idx)
+
+                            
+                            
+                            
+                            
+                            
                         avg_psnr += Metrics.calculate_psnr(
                             sr_img, hr_img)
                         avg_ssim += Metrics.calculate_ssim(
@@ -232,6 +250,21 @@ if __name__ == "__main__":
         logger.info('End of training.')
     else:
         logger.info('Begin Model Evaluation.')
+
+        def pick_last(x):
+        
+            if torch.is_tensor(x) and x.dim() == 4:
+                return x[-1]
+            return x
+
+        def pick_first(x):
+        
+            if torch.is_tensor(x) and x.dim() == 4:
+                return x[0]
+            return x
+
+
+
         avg_psnr = 0.0
         avg_ssim = 0.0
         avg_sam = 0.0
@@ -244,6 +277,8 @@ if __name__ == "__main__":
         all_ssim_stds = []
         all_sam_means = []
         all_sam_stds = []
+
+        
 
         for _,  val_data in enumerate(val_loader):
             idx += 1
@@ -265,29 +300,24 @@ if __name__ == "__main__":
                     if key == 'SR':
                         sr_images.append(value[-1])
             for key in visuals_average:
-                    visuals_average[key] /= n_runs
-            hr_img = Metrics.tensor2img(visuals_average['HR'])  # uint8
-            lr_img = Metrics.tensor2img(visuals_average['LR'])  # uint8
-            fake_img = Metrics.tensor2img(visuals_average['INF'])  # uint8
+                visuals_average[key] /= n_runs
+
+            hr_img   = Metrics.tensor2img(pick_first(visuals_average['HR']))
+            lr_img   = Metrics.tensor2img(pick_first(visuals_average['LR']))
+            fake_img = Metrics.tensor2img(pick_last(visuals_average['INF']))
+
             sr_stack = torch.stack(sr_images, dim=0)
             sr_mean = Metrics.tensor2img(sr_stack.mean(dim=0))             # (C,H,W)
             sr_std  = Metrics.tensor2img(sr_stack.std(dim=0, unbiased=False))
 
-            sr_img_mode = 'grid'
-            if sr_img_mode == 'single':
-                # single img series
-                sr_img = visuals_average['SR']  # uint8
-                sample_num = sr_img.shape[0]
-                for iter in range(0, sample_num):
-                    Metrics.save_img(
-                        Metrics.tensor2img(sr_img[iter]), '{}/{}_{}_sr_{}.png'.format(result_path, current_step, idx, iter))
-            else:
-                # grid img
-                sr_img = Metrics.tensor2img(visuals_average['SR'])  # uint8
-                Metrics.save_img(
-                    sr_img, '{}/{}_{}_sr_process.png'.format(result_path, current_step, idx))
-                Metrics.save_img(
-                    Metrics.tensor2img(visuals_average['SR'][-1]), '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
+
+            sr_final = pick_last(visuals_average['SR'])
+            sr_img   = Metrics.tensor2img(sr_final)
+
+
+            Metrics.save_img(sr_mean, '{}/{}_{}_sr_process.png'.format(result_path, current_step, idx))
+            Metrics.save_img(sr_img,  '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
+
 
             Metrics.save_img(
                 hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
@@ -301,9 +331,10 @@ if __name__ == "__main__":
                 sr_std, '{}/{}_{}_sr_std.png'.format(result_path, current_step, idx))
 
             # generation
-            eval_psnr = Metrics.calculate_psnr(Metrics.tensor2img(visuals_average['SR'][-1]), hr_img)
-            eval_ssim = Metrics.calculate_ssim(Metrics.tensor2img(visuals_average['SR'][-1]), hr_img)
-            eval_sam,sam_stats  = Metrics.calculate_sam(Metrics.tensor2img(visuals_average['SR'][-1]), hr_img)
+            eval_psnr = Metrics.calculate_psnr(sr_img, hr_img)
+            eval_ssim = Metrics.calculate_ssim(sr_img, hr_img)
+            eval_sam, sam_stats = Metrics.calculate_sam(sr_img, hr_img)
+
             eval_sam = Metrics.tensor2img(eval_sam)
             Metrics.save_img(eval_sam, '{}/{}_{}_sr_sam_of_mean.png'.format(result_path, current_step, idx))
 
@@ -337,7 +368,7 @@ if __name__ == "__main__":
             avg_ssim += eval_ssim
             avg_sam += sam_stats['mean_deg']
             if wandb_logger and opt['log_eval']:
-                wandb_logger.log_eval_data(fake_img, Metrics.tensor2img(visuals_average['SR'][-1]), hr_img, eval_psnr, eval_ssim)
+                wandb_logger.log_eval_data(fake_img, sr_img, hr_img, eval_psnr, eval_ssim)
 
         avg_psnr = avg_psnr / idx
         avg_ssim = avg_ssim / idx
