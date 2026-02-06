@@ -84,15 +84,15 @@ class LRHRDataset(Dataset):
                             'lr_{}_{}'.format(
                                 self.l_res, str(new_index).zfill(5)).encode('utf-8')
                         )
-                img_HR = Image.open(BytesIO(hr_img_bytes)).convert("RGB")
-                img_SR = Image.open(BytesIO(sr_img_bytes)).convert("RGB")
+                img_HR = Image.open(BytesIO(hr_img_bytes)).convert("L")
+                img_SR = Image.open(BytesIO(sr_img_bytes)).convert("L")
                 if self.need_LR:
-                    img_LR = Image.open(BytesIO(lr_img_bytes)).convert("RGB")
+                    img_LR = Image.open(BytesIO(lr_img_bytes)).convert("L")
         else:
-            img_HR = Image.open(self.hr_path[index]).convert("RGB")
-            img_SR = Image.open(self.sr_path[index]).convert("RGB")
+            img_HR = Image.open(self.hr_path[index]).convert("L")
+            img_SR = Image.open(self.sr_path[index]).convert("L")
             if self.need_LR:
-                img_LR = Image.open(self.lr_path[index]).convert("RGB")
+                img_LR = Image.open(self.lr_path[index]).convert("L")
         if self.need_LR:
             [img_LR, img_SR, img_HR] = Util.transform_augment(
                 [img_LR, img_SR, img_HR], split=self.split, min_max=(-1, 1))
