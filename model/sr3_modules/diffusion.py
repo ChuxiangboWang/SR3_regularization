@@ -116,7 +116,7 @@ class GaussianDiffusion(nn.Module):
         
         
         
-        
+    
         
         
         
@@ -139,6 +139,11 @@ class GaussianDiffusion(nn.Module):
 
 
     def vgg_features(self, x):
+        
+        
+        if x.dim() == 4 and x.size(1) == 1:
+            x = x.repeat(1, 3, 1, 1)   # [B,1,H,W] -> [B,3,H,W]
+        
         # normalized to ImageNet mean and std
         mean = torch.tensor([0.485, 0.456, 0.406], device=x.device).view(1,3,1,1)
         std = torch.tensor([0.229, 0.224, 0.225], device=x.device).view(1,3,1,1)
